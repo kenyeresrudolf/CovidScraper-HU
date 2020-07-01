@@ -21,9 +21,31 @@ from openpyxl import load_workbook
 import datetime as dt
 import xlsappend as xls
 
+jelenlegioldal = 0
+daraboldal = 2
+dataframe = pd.DataFrame()
+while jelenlegioldal != daraboldal:
+        url = "https://koronavirus.gov.hu/elhunytak?page=" + str(jelenlegioldal)
+        try:
+            response = requests.get(url,allow_redirects=False)
+            html2 = response.text
+            #----megtudni hány darab oldalt kell megnézni.----
+            if jelenlegioldal == 0:
+                daraboldal = int(((html2.split(str('">' + "utolsó »"))[0]).split('utolsó oldalra" href="/elhunytak?page=')[1]))+1
+                print(str(daraboldal) + " darab oldal van.")
+            #----end----
+            print(str(daraboldal) + "/" + str(jelenlegioldal+1) + ". oldal táblázatát olvastam be.")
+            #print(pd.read_html(html2)[0])
+            dataframe = dataframe.append(pd.read_html(html2)[0])
+            jelenlegioldal = jelenlegioldal + 1
+        except requests.ConnectionError:
+            dataframe = pd.DataFrame([["Nincs kapcsolat!","Nincs kapcsolat!","Nincs kapcsolat!","Nincs kapcsolat!"]],columns=["Nincs kapcsolat!","Nincs kapcsolat!","Nincs kapcsolat!","Nincs kapcsolat!"])
+            break                  
+print(dataframe)              
+
 #defining the scrapable parts of the site
-link = "https://koronavirus.gov.hu/elhunytak"
-offset = ['?page=1', '?page=2','?page=3','?page=4','?page=5','?page=6','?page=7','?page=8','?page=9','?page=10','?page=11','?page=12',]
+link = "https://koronavirus.gov.hu/elhunytak?page="
+offset = list(range (1,daraboldal))
 result = requests.get (link)
 src = result.content
 soup = BeautifulSoup(src, 'lxml')
@@ -33,7 +55,7 @@ illness = soup.find_all("td", {"class": "views-field views-field-field-elhunytak
 
 #age
 for i in range(0,len(offset)):
-    result = requests.get (link+offset[i])
+    result = requests.get (link+str(offset[i]))
     src = result.content
     soup = BeautifulSoup(src, 'lxml')
     age += soup.find_all("td", {"class": "views-field views-field-field-elhunytak-kor"})
@@ -47,7 +69,7 @@ agetable[0] = agetable[0].astype(int)
 
 #sex
 for i in range(0,len(offset)):
-    result = requests.get (link+offset[i])
+    result = requests.get (link+str(offset[i]))
     src = result.content
     soup = BeautifulSoup(src, 'lxml')
     gender += soup.find_all("td", {"class": "views-field views-field-field-elhunytak-nem"})
@@ -61,7 +83,7 @@ gendertable[0] = gendertable[0].astype(str)
 
 #illnesses
 for i in range(0,len(offset)):
-    result = requests.get (link+offset[i])
+    result = requests.get (link+str(offset[i]))
     src = result.content
     soup = BeautifulSoup(src, 'lxml')
     illness += soup.find_all("td", {"class": "views-field views-field-field-elhunytak-alapbetegsegek"})
@@ -163,7 +185,7 @@ merged.index = merged.index + 1
 calculated.index = calculated.index+1 
 
 #excel -export - rewriting tables
-with pd.ExcelWriter('covid_death_total_0511.xlsx') as writer:
+with pd.ExcelWriter('covid_death_total.xlsx') as writer:
     merged.to_excel(writer,sheet_name = 'base')
     illzvert.to_excel(writer, sheet_name = 'illztotal')
     top10illz.to_excel(writer, sheet_name = 'top10illz')
